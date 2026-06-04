@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Real-Time Orders Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #events {
+        border: 1px solid #ccc;
+        padding: 10px;
+        height: 300px;
+        overflow-y: scroll;
+        background: #f9f9f9;
+        margin-top: 20px;
+      }
+      .event-log {
+        margin: 5px 0;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+      }
+      .INSERT {
+        color: green;
+        font-weight: bold;
+      }
+      .UPDATE {
+        color: orange;
+        font-weight: bold;
+      }
+      .DELETE {
+        color: red;
+        font-weight: bold;
+      }
+      button {
+        padding: 10px 15px;
+        margin-right: 10px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Real-Time Orders Dashboard</h1>
+    <p>Open this page in multiple tabs or browsers to see real-time updates!</p>
+
+    <div>
+      <button onclick="createOrder()">Create Random Order</button>
+      <button onclick="updateRandomOrder()">Update Random Order</button>
+      <button onclick="deleteRandomOrder()">Delete Random Order</button>
+    </div>
+
+    <h3>Live Event Feed:</h3>
+    <div id="events"></div>
+
+    <script>
+      const socket = io(); // Connects to current origin
+      const eventsDiv = document.getElementById("events");
+      let orderIds = [];
+
+      socket.on("connect", () => {
+        logEvent("SYSTEM", "Connected to real-time server.");
+      });
+
+      socket.on("order_update", (data) => {
+        const { eventType, order } = data;
+        logEvent(
+          eventType,
+          `${eventType} Order ID ${order.id}: ${order.customer_name} - ${order.product_name} (${order.status})`,
+        );
+
+        if (eventType === "INSERT") orderIds.push(order.id);
+        else if (eventType === "DELETE")
+          orderIds = orderIds.filter((id) => id !== order.id);
+      });
+
+      function logEvent(type, message) {
+        const div = document.createElement("div");
+        div.className = `event-log ${type}`;
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        eventsDiv.prepend(div);
+      }
+
+      async function createOrder() {
+        await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer_name: "Customer " + Math.floor(Math.random() * 1000),
+            product_name: "Product " + Math.floor(Math.random() * 100),
+            status: ["pending", "shipped", "delivered"][
+              Math.floor(Math.random() * 3)
+            ],
+          }),
+        });
+      }
+
+      async function updateRandomOrder() {
+        if (orderIds.length === 0) return alert("No orders to update!");
+        const id = orderIds[Math.floor(Math.random() * orderIds.length)];
+        await fetch(`/api/orders/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: ["pending", "shipped", "delivered"][
+              Math.floor(Math.random() * 3)
+            ],
+          }),
+        });
+      }
+
+      async function deleteRandomOrder() {
+        if (orderIds.length === 0) return alert("No orders to delete!");
+        const id = orderIds[Math.floor(Math.random() * orderIds.length)];
+        await fetch(`/api/orders/${id}`, { method: "DELETE" });
+      }
+    </script>
+  </body>
+</html>
